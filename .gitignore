@@ -1,0 +1,18 @@
+# build outputs
+build/
+release/
+GameData/Seamless/Plugins/*.dll
+GameData/Seamless/Plugins/*.pdb
+tools/build.rsp
+tools/sdfgen/bin/
+tools/sdfgen/obj/
+
+# local deploy bookkeeping (hashes of settings.cfg versions shipped to the installs)
+tools/shipped-settings.sha256
+
+# editor / OS
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini
