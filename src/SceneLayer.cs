@@ -16,14 +16,21 @@ namespace Seamless
     /// froze and got it back when the new scene showed.
     ///
     /// While HDR output is on, the frozen frame is therefore drawn by a camera of its own below
-    /// that depth (above the game's 3D cameras), and it is captured there as well: the 3D picture
-    /// alone, without the bars and the card, which the overlay keeps drawing over it as UI.
-    /// Without HDR output nothing here is used.
+    /// that depth, and it is captured there as well: the 3D picture alone, without the bars and
+    /// the card, which the overlay keeps drawing over it as UI. Without HDR output nothing here
+    /// is used.
+    ///
+    /// The camera also has to come after Retooled's anti-aliasing, which draws the 3D cameras
+    /// into a texture and puts the result on the screen from a camera at depth 4.5: before that
+    /// the screen still holds the last frame as it went to the display.
     /// </summary>
     internal sealed class SceneLayer
     {
-        // above the game's 3D cameras (flight's go up to 4), below Retooled's HDR camera (5)
-        private const float Depth = 4.5f;
+        // Retooled's depth for overlays on the finished 3D picture: after its anti-aliasing (4.5),
+        // before its HDR camera (5)
+        private const float Depth = 4.8f;
+        // a camera that draws nothing still gets this event; some Unity versions skip AfterEverything
+        private const CameraEvent CopyEvent = CameraEvent.AfterForwardAlpha;
         // a layer and a place of its own, so the camera draws the frozen frame and nothing else
         private const int Layer = 14;
         private static readonly Vector3 Place = new Vector3(9000f, -9000f, 9000f);
@@ -116,7 +123,7 @@ namespace Seamless
                 shot.Create();
                 copy = new CommandBuffer { name = "Seamless frozen frame" };
                 copy.Blit(BuiltinRenderTextureType.CurrentActive, shot);
-                cam.AddCommandBuffer(CameraEvent.AfterEverything, copy);
+                cam.AddCommandBuffer(CopyEvent, copy);
                 cam.clearFlags = CameraClearFlags.Nothing;
                 cam.cullingMask = 0;
                 cam.enabled = true;
@@ -157,7 +164,7 @@ namespace Seamless
         {
             if (copy != null)
             {
-                try { cam.RemoveCommandBuffer(CameraEvent.AfterEverything, copy); } catch { }
+                try { cam.RemoveCommandBuffer(CopyEvent, copy); } catch { }
                 copy.Release();
                 copy = null;
             }

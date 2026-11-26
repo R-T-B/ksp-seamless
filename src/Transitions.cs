@@ -216,10 +216,12 @@ namespace Seamless
         }
 
         /// <summary>Any scene change: KSP's loading screen is drawn normally again (under our card
-        /// when the change is ours).</summary>
+        /// when the change is ours). Where the frozen frame is drawn under the UI cameras it would
+        /// cover the frame instead, so there it stays off through our own load.</summary>
         private void OnSceneLoadRequested(GameScenes scene)
         {
             RestoreMask();
+            if (loadIssued && phase == Phase.Loading && overlay != null && overlay.FrozenUnderUi) SuppressMask();
             if (stockEndPending) { stockEndPending = false; Log.Info("next scene requested before KSP's loading screen ended"); }
         }
 
@@ -1343,8 +1345,6 @@ namespace Seamless
                     measuring = true;
                     stockEndPending = false;
                     bypass = true;
-                    // nothing of ours covers KSP's loading screen then: it must not draw at all
-                    if (overlay != null && overlay.FrozenUnderUi) SuppressMask();
                     HighLogic.LoadScene(targetScene);
                     break;
 
