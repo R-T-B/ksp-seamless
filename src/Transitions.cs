@@ -234,6 +234,7 @@ namespace Seamless
         private void OnLevelWasLoaded(GameScenes scene)
         {
             if (loadIssued && scene == targetScene) sceneArrived = true;
+            canvasScanFrame = 0;
             if (phase != Phase.Idle) hudSceneFrame = Time.frameCount;
         }
 
@@ -1286,6 +1287,7 @@ namespace Seamless
             WatchStockMask();
             ScenePreload.Poll(phase == Phase.Idle);
             HideModHuds();
+            HideCanvases();
             if (phase == Phase.Idle)
             {
                 if (double.IsNaN(kscLat) && HighLogic.LoadedScene == GameScenes.SPACECENTER) RememberKsc();
@@ -2549,6 +2551,42 @@ namespace Seamless
             }
             catch (Exception e) { Log.Warn("hide HUD: " + e.Message); }
             uiHidden = true;
+            canvasScanFrame = 0;
+        }
+
+        private readonly System.Collections.Generic.List<Canvas> hiddenCanvases = new System.Collections.Generic.List<Canvas>();
+        private int canvasScanFrame;
+
+        /// <summary>
+        /// Screen-space canvases outside the game's HUD (mods' windows and toolbars, the game's own
+        /// dialogs) follow neither HideUI nor, always, the onHideUI event, and a new scene brings
+        /// new ones: while a transition holds the HUD they are switched off as they turn up, and
+        /// switched on again when it ends. World-space canvases belong to the scene and stay.
+        /// </summary>
+        private void HideCanvases()
+        {
+            if (!uiHidden || phase == Phase.Idle || Time.frameCount < canvasScanFrame) return;
+            canvasScanFrame = Time.frameCount + 5;
+            try
+            {
+                foreach (Canvas c in UnityEngine.Object.FindObjectsOfType<Canvas>())
+                {
+                    if (c == null || !c.enabled || !c.isRootCanvas || c.renderMode == RenderMode.WorldSpace) continue;
+                    if (c.transform.root.name.StartsWith("Seamless", StringComparison.Ordinal)) continue;
+                    c.enabled = false;
+                    hiddenCanvases.Add(c);
+                }
+            }
+            catch (Exception e) { Log.Warn("hiding canvases: " + e.Message); }
+        }
+
+        private void RestoreCanvases()
+        {
+            foreach (Canvas c in hiddenCanvases)
+            {
+                try { if (c != null) c.enabled = true; } catch { }
+            }
+            hiddenCanvases.Clear();
         }
 
         /// <summary>Re-hide the canvases every frame while the card covers the scene: the game's
@@ -2602,6 +2640,7 @@ namespace Seamless
             RestoreOrbits();   // back to normal once the reveal is over
             InputLockManager.RemoveControlLock(LockId);
             Unpause();
+            RestoreCanvases();
             if (uiHidden)
             {
                 try

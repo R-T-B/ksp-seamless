@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using HarmonyLib;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Seamless
@@ -50,6 +51,15 @@ namespace Seamless
                               prefix: new HarmonyMethod(typeof(HarmonyHook), nameof(EventFirePrefix)));
             }
             catch (Exception e) { Log.Warn("HUD event hold not installed: " + e.Message); }
+
+            // Mods' IMGUI windows need not follow those events (Kerbal Construction Time's don't): while
+            // a transition holds the HUD, every OnGUI call gets its repaint and input events blanked.
+            try
+            {
+                harmony.Patch(AccessTools.Method(typeof(GUIUtility), "BeginGUI"),
+                              postfix: new HarmonyMethod(typeof(HarmonyHook), nameof(BeginGuiPostfix)));
+            }
+            catch (Exception e) { Log.Warn("IMGUI hold not installed: " + e.Message); }
 
             // KSPTextureLoader refuses blocking loads while a scene switch is pending (it would wait on
             // Unity's async queue). The queue is stalled the whole time a preloaded scene is held, so
@@ -123,6 +133,19 @@ namespace Seamless
             if (!ReferenceEquals(__instance, GameEvents.onShowUI)) return true;
             try { return !Transitions.HoldingHud; }
             catch { return true; }
+        }
+
+        /// <summary>Runs before each MonoBehaviour's OnGUI. Controls draw on Repaint events and react
+        /// to input events only; Layout stays, so GUILayout's bookkeeping is as on any frame.</summary>
+        private static void BeginGuiPostfix()
+        {
+            try
+            {
+                if (!Transitions.HoldingHud) return;
+                Event e = Event.current;
+                if (e != null && e.type != EventType.Layout && e.type != EventType.Used) e.type = EventType.Ignore;
+            }
+            catch { }
         }
 
         private static bool ShowUIPrefix()
