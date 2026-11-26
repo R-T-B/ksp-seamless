@@ -1320,7 +1320,12 @@ namespace Seamless
                     HoldVessels();
                     if (!departAlive()) { Freeze(false); break; }
                     ApplyCurrent(true);
-                    if (t >= turnSeconds + travelSeconds) { phase = Phase.Capture; StartCoroutine(CaptureAtEndOfFrame()); }
+                    if (t >= turnSeconds + travelSeconds)
+                    {
+                        phase = Phase.Capture;
+                        overlay.BeginSceneCapture();
+                        StartCoroutine(CaptureAtEndOfFrame());
+                    }
                     break;
 
                 case Phase.Capture:
@@ -1338,6 +1343,8 @@ namespace Seamless
                     measuring = true;
                     stockEndPending = false;
                     bypass = true;
+                    // nothing of ours covers KSP's loading screen then: it must not draw at all
+                    if (overlay != null && overlay.FrozenUnderUi) SuppressMask();
                     HighLogic.LoadScene(targetScene);
                     break;
 
@@ -1595,7 +1602,7 @@ namespace Seamless
             {
                 if (capture)
                 {
-                    Texture2D tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    Texture2D tex = overlay.TakeSceneCapture() ?? ScreenCapture.CaptureScreenshotAsTexture();
                     var px = tex.GetPixels32();
                     for (int i = 0; i < px.Length; i++) px[i].a = 255;   // the back buffer's alpha is not reliable
                     tex.SetPixels32(px);
